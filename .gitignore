@@ -11,3 +11,6 @@ wheels/
 
 # Mac
 .DS_Store
+
+# Project
+output/
