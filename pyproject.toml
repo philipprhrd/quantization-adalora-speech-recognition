@@ -7,6 +7,10 @@ requires-python = "==3.13.*"
 dependencies = [
     "evaluate>=0.4.6",
     "peft==0.18.1",
+    "torchao>=0.16.0",
     "transformers==5.2.0",
     "typer>=0.24.0",
 ]
+
+[tool.uv]
+extra-index-url = "https://download.pytorch.org/whl/cu126"
