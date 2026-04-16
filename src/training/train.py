@@ -199,7 +199,7 @@ class ModelTrainer:
             model=self.model,
             args=training_args,
             train_dataset=dataset["train"],
-            eval_dataset=dataset["eval"],
+            eval_dataset=dataset["dev"],
             data_collator=data_collator,
             tokenizer=self.processor.tokenizer,
         )

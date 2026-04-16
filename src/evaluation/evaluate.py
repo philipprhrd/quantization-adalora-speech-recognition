@@ -106,7 +106,7 @@ class ModelEvaluator:
 
     def evaluate_dataset(self, dataset_path: str):
         print(f"Loading dataset from {dataset_path}")
-        dataset = load_from_disk(dataset_path)["eval"]
+        dataset = load_from_disk(dataset_path)["test"]
 
         predictions = []
         references = []
