@@ -73,14 +73,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--eval-steps",
         type=int,
-        default=500,
-        help="Run evaluation every N steps (default: 500).",
+        default=300,
+        help="Run evaluation every N steps (default: 300).",
     )
     parser.add_argument(
         "--save-steps",
         type=int,
-        default=500,
-        help="Save checkpoint every N steps (default: 500).",
+        default=300,
+        help="Save checkpoint every N steps (default: 300).",
     )
     parser.add_argument(
         "--no-fp16",

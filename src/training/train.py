@@ -163,8 +163,8 @@ class ModelTrainer:
         fp16: bool = True,
         gradient_accumulation_steps: int = 2,
         logging_steps: int = 100,
-        eval_steps=500,
-        save_steps: int = 500,
+        eval_steps: int = 300,
+        save_steps: int = 300,
     ) -> None:
         print(f"Loading data from {dataset_path}")
         dataset = load_from_disk(dataset_path)
@@ -187,6 +187,7 @@ class ModelTrainer:
             eval_steps=eval_steps,
             save_strategy="steps",
             save_steps=save_steps,
+            save_total_limit=3,
             logging_steps=logging_steps,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
@@ -205,7 +206,7 @@ class ModelTrainer:
         )
 
         print("Starting training...")
-        trainer.train()
+        trainer.train(resume_from_checkpoint=True)
 
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
