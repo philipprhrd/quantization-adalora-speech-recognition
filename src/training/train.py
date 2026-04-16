@@ -179,8 +179,15 @@ class ModelTrainer:
         total_steps = steps_per_epoch * num_epochs
         print(f"AdaLoRA total_step: {total_steps} ({steps_per_epoch} steps/epoch × {num_epochs} epochs)")
 
+        tinit  = max(1, int(0.10 * total_steps))
+        tfinal = max(tinit + 1, int(0.90 * total_steps))
+        print(f"AdaLoRA schedule: tinit={tinit}, tfinal={tfinal}, total_step={total_steps}")
+
         for config in self.model.peft_config.values():
             config.total_step = total_steps
+            config.tinit      = tinit
+            config.tfinal     = tfinal
+        # total_step is copied into RankAllocator at init — patch it directly
         if hasattr(self.model.base_model, "rankallocator"):
             self.model.base_model.rankallocator.total_step = total_steps
 
