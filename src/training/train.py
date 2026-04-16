@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Union
@@ -168,6 +169,20 @@ class ModelTrainer:
     ) -> None:
         print(f"Loading data from {dataset_path}")
         dataset = load_from_disk(dataset_path)
+
+        # Compute total training steps so AdaLoRA's rank scheduler has the
+        # correct budget.  Must happen after dataset loading (size is unknown
+        # until here) and before Trainer.train().
+        steps_per_epoch = math.ceil(
+            len(dataset["train"]) / (batch_size * gradient_accumulation_steps)
+        )
+        total_steps = steps_per_epoch * num_epochs
+        print(f"AdaLoRA total_step: {total_steps} ({steps_per_epoch} steps/epoch × {num_epochs} epochs)")
+
+        for config in self.model.peft_config.values():
+            config.total_step = total_steps
+        if hasattr(self.model.base_model, "rankallocator"):
+            self.model.base_model.rankallocator.total_step = total_steps
 
         data_collator = DataCollatorSpeechSeq2SeqWithPadding(
             processor=self.processor,
