@@ -192,7 +192,7 @@ def main() -> None:
     with open(Path(args.output_dir) / "results.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
     
-    print(f"\nResults saved to {args.results_file}")
+    print(f"\nResults saved to {Path(args.output_dir) / 'results.json'}")
 
 
 if __name__ == "__main__":
