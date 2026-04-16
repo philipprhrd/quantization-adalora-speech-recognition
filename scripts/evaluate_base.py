@@ -43,7 +43,7 @@ def main() -> None:
         model_path=args.model_name,
         base_model=args.model_name,
         is_lora=False,
-        device=args.device,
+        device=args.eval_device,
         quantization=quantization,
     )
 

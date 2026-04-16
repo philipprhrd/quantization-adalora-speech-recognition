@@ -140,7 +140,7 @@ def main() -> None:
 
     trainer = ModelTrainer(
         model_name=args.model_name,
-        device=args.device,
+        device=args.eval_device,
         quantization=train_quantization,
     )
 
