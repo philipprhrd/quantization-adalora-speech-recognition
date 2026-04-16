@@ -39,7 +39,7 @@ class OnnxModelEvaluator:
 
     def evaluate_dataset(self, dataset_path: str) -> dict:
         print(f"Loading dataset from {dataset_path}")
-        dataset = load_from_disk(dataset_path)["eval"]
+        dataset = load_from_disk(dataset_path)["test"]
 
         input_col = (
             "input_features"
