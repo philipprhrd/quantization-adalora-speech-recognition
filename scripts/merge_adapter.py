@@ -52,7 +52,7 @@ def main() -> None:
     print(f"Loading base model in fp32: {args.base_model}")
     base = AutoModelForSpeechSeq2Seq.from_pretrained(
         args.base_model,
-        torch_dtype=torch.float32,
+        dtype=torch.float32,
     )
 
     print(f"Loading PEFT adapter from: {args.adapter_path}")

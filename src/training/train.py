@@ -3,7 +3,9 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Union
+import numpy as np
 from datasets import load_from_disk
+from jiwer import wer as compute_wer, cer as compute_cer
 from peft import get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForSpeechSeq2Seq,
@@ -107,7 +109,7 @@ class ModelTrainer:
             )
 
         model_kwargs = {
-            "torch_dtype": torch.float16
+            "dtype": torch.float16
             if torch.cuda.is_available()
             else torch.float32,
         }
@@ -183,6 +185,19 @@ class ModelTrainer:
             self.model.generation_config.task = "transcribe"
         self.model.generation_config.forced_decoder_ids = None
 
+        tokenizer = self.processor.tokenizer
+        pad_id = tokenizer.pad_token_id
+
+        def compute_metrics(pred):
+            pred_ids = pred.predictions
+            label_ids = np.where(pred.label_ids != -100, pred.label_ids, pad_id)
+            pred_str  = tokenizer.batch_decode(pred_ids,  skip_special_tokens=True)
+            label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
+            return {
+                "wer": compute_wer(label_str, pred_str),
+                "cer": compute_cer(label_str, pred_str),
+            }
+
         data_collator = DataCollatorSpeechSeq2SeqWithPadding(
             processor=self.processor,
             decoder_start_token_id=self.model.config.decoder_start_token_id,
@@ -203,8 +218,9 @@ class ModelTrainer:
             save_steps=save_steps,
             save_total_limit=3,
             logging_steps=logging_steps,
+            predict_with_generate=True,
             load_best_model_at_end=True,
-            metric_for_best_model="eval_loss",
+            metric_for_best_model="wer",
             greater_is_better=False,
             remove_unused_columns=False,
             label_names=["labels"],
@@ -217,6 +233,7 @@ class ModelTrainer:
             eval_dataset=dataset["dev"],
             data_collator=data_collator,
             tokenizer=self.processor.tokenizer,
+            compute_metrics=compute_metrics,
         )
 
         print("Starting training...")
