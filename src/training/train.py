@@ -199,7 +199,11 @@ class ModelTrainer:
             _moonshine_base = self.model.base_model.model
             _orig_fwd = _moonshine_base.forward
             def _fwd_no_input_ids(*args, **kwargs):
+                # PEFT passes both as None (text-model assumption); neither is in
+                # Moonshine's named params so they leak via **kwargs to the decoder
+                # where they conflict with the decoder's own explicit params.
                 kwargs.pop("input_ids", None)
+                kwargs.pop("inputs_embeds", None)
                 return _orig_fwd(*args, **kwargs)
             _moonshine_base.forward = _fwd_no_input_ids
 
