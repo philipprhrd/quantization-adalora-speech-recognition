@@ -173,7 +173,7 @@ class ModelTrainer:
         print(f"AdaLoRA total_step: {total_steps} ({steps_per_epoch} steps/epoch × {num_epochs} epochs)")
 
         tinit  = max(1, int(0.10 * total_steps))
-        tfinal = max(tinit + 1, int(0.90 * total_steps))
+        tfinal = max(tinit + 1, int(0.60 * total_steps))
         print(f"AdaLoRA schedule: tinit={tinit}, tfinal={tfinal}, total_step={total_steps}")
 
         print("Applying LoRA configuration")
