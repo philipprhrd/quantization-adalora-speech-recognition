@@ -114,9 +114,11 @@ class ModelTrainer:
                 "bnb_4bit_compute_dtype must be one of: 'float16', 'bfloat16', 'float32'"
             )
 
+        # float16 only for quantized models (bitsandbytes compute dtype);
+        # non-quantized training uses float32 weights + fp16=True AMP in trainer.
         model_kwargs = {
             "torch_dtype": torch.float16
-            if torch.cuda.is_available()
+            if (torch.cuda.is_available() and self.quantization is not None)
             else torch.float32,
         }
 
