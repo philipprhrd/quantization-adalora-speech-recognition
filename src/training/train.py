@@ -192,6 +192,17 @@ class ModelTrainer:
         lora_config = get_adalora_config(self.model_name, tinit, tfinal, total_steps)
         self.model = get_peft_model(self.model, lora_config)
 
+        # PeftModelForSeq2SeqLM always passes input_ids=None (text-model assumption)
+        # via **kwargs down to MoonshineDecoder, where it conflicts with the explicit
+        # input_ids=decoder_input_ids argument at modeling_moonshine.py:819.
+        if "moonshine" in self.model_name.lower():
+            _moonshine_base = self.model.base_model.model
+            _orig_fwd = _moonshine_base.forward
+            def _fwd_no_input_ids(*args, **kwargs):
+                kwargs.pop("input_ids", None)
+                return _orig_fwd(*args, **kwargs)
+            _moonshine_base.forward = _fwd_no_input_ids
+
         if self.model.config.model_type == "whisper":
             self.model.generation_config.language = "german"
             self.model.generation_config.task = "transcribe"
