@@ -1,7 +1,7 @@
 from peft import AdaLoraConfig, LoraConfig, TaskType
 
 
-def get_adalora_config(base_model: str) -> LoraConfig:
+def get_adalora_config(base_model: str, tinit: int, tfinal: int, total_step: int) -> LoraConfig:
     if "whisper" in base_model:
         target_modules = [
             "q_proj",  # Query projection
@@ -29,11 +29,12 @@ def get_adalora_config(base_model: str) -> LoraConfig:
         lora_dropout=0.05,
         init_r=12,
         target_r=4,
-        tinit=200,
-        tfinal=800,
+        tinit=tinit,
+        tfinal=tfinal,
         deltaT=10,
         beta1=0.85,
         beta2=0.85,
+        total_step=total_step
     )
 
     return config

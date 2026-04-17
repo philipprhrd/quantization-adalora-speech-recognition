@@ -139,19 +139,10 @@ class ModelTrainer:
         if device != "auto" and self.quantization is None:
             self.model.to(device)
 
-        
-        print("Applying LoRA configuration")
-        lora_config = get_adalora_config(model_name)
         if self.quantization is not None:
             self.model = prepare_model_for_kbit_training(self.model)
-        self.model = get_peft_model(self.model, lora_config)
 
-        # Moonshine ist kein Whisper-Derivat und verwendet keine Whisper-Sprach-/Task-Prompts in der GenerationConfig.
-        if self.model.config.model_type == "whisper":
-            self.model.generation_config.language = "german"
-            self.model.generation_config.task = "transcribe"
-
-        self.model.generation_config.forced_decoder_ids = None
+        # get_peft_model is called in train() once total_steps is known
 
     def train(
         self,
@@ -183,13 +174,14 @@ class ModelTrainer:
         tfinal = max(tinit + 1, int(0.90 * total_steps))
         print(f"AdaLoRA schedule: tinit={tinit}, tfinal={tfinal}, total_step={total_steps}")
 
-        for config in self.model.peft_config.values():
-            config.total_step = total_steps
-            config.tinit      = tinit
-            config.tfinal     = tfinal
-        # total_step is copied into RankAllocator at init — patch it directly
-        if hasattr(self.model.base_model, "rankallocator"):
-            self.model.base_model.rankallocator.total_step = total_steps
+        print("Applying LoRA configuration")
+        lora_config = get_adalora_config(self.model_name, tinit, tfinal, total_steps)
+        self.model = get_peft_model(self.model, lora_config)
+
+        if self.model.config.model_type == "whisper":
+            self.model.generation_config.language = "german"
+            self.model.generation_config.task = "transcribe"
+        self.model.generation_config.forced_decoder_ids = None
 
         data_collator = DataCollatorSpeechSeq2SeqWithPadding(
             processor=self.processor,
