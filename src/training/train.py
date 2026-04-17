@@ -51,8 +51,12 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         input_features = [{input_name: feature[input_name]} for feature in features]
 
         batch = self.processor.feature_extractor.pad(
-            input_features, return_tensors="pt"
+            input_features, return_tensors="pt", return_attention_mask=True
         )
+        # Keep only the audio tensor and its mask — removes any extra keys
+        # (e.g. input_ids) that some feature extractors add and that would
+        # conflict with the decoder's input_ids parameter.
+        batch = {k: v for k, v in batch.items() if k in {input_name, "attention_mask"}}
 
         # Pad labels with -100 (loss ignore index) directly — avoids needing
         # a pad_token on the tokenizer, which Moonshine does not have by default.
