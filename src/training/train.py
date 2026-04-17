@@ -49,16 +49,18 @@ class DataCollatorSpeechSeq2SeqWithPadding:
     ) -> Dict[str, torch.Tensor]:
         input_name = self._resolve_input_name(features[0])
         input_features = [{input_name: feature[input_name]} for feature in features]
-        label_features = [{"input_ids": feature["labels"]} for feature in features]
 
         batch = self.processor.feature_extractor.pad(
             input_features, return_tensors="pt"
         )
 
-        labels_batch = self.processor.tokenizer.pad(label_features, return_tensors="pt")
-
-        labels = labels_batch["input_ids"].masked_fill(
-            labels_batch.attention_mask.ne(1), -100
+        # Pad labels with -100 (loss ignore index) directly — avoids needing
+        # a pad_token on the tokenizer, which Moonshine does not have by default.
+        label_tensors = [
+            torch.tensor(f["labels"], dtype=torch.long) for f in features
+        ]
+        labels = torch.nn.utils.rnn.pad_sequence(
+            label_tensors, batch_first=True, padding_value=-100
         )
 
         if (
@@ -96,7 +98,9 @@ class ModelTrainer:
 
         self.processor = AutoProcessor.from_pretrained(model_name)
         if self.processor.tokenizer.pad_token is None:
-            self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
+            self.processor.tokenizer.add_special_tokens(
+                {"pad_token": self.processor.tokenizer.eos_token}
+            )
 
         print(f"Loading model: {model_name}")
 
