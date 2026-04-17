@@ -95,6 +95,8 @@ class ModelTrainer:
             )
 
         self.processor = AutoProcessor.from_pretrained(model_name)
+        if self.processor.tokenizer.pad_token is None:
+            self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
 
         print(f"Loading model: {model_name}")
 
