@@ -13,5 +13,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     ds = load_from_disk(args.dataset_path)
-    print(ds["train"][0]["input_values"].shape)
-    print(ds["train"][1]["input_values"].shape)
+    print(len(ds["train"][0]["input_values"]))
+    print(len(ds["train"][1]["input_values"]))
