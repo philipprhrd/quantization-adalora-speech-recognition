@@ -187,6 +187,12 @@ class ModelTrainer:
             self.model.generation_config.task = "transcribe"
         self.model.generation_config.forced_decoder_ids = None
 
+        # Moonshine has no pad_token_id by default — generate() requires it
+        if self.model.config.pad_token_id is None:
+            pad_id = self.processor.tokenizer.eos_token_id
+            self.model.config.pad_token_id = pad_id
+            self.model.generation_config.pad_token_id = pad_id
+
         tokenizer = self.processor.tokenizer
         pad_id = tokenizer.pad_token_id
 
