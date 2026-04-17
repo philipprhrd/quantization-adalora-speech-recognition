@@ -97,10 +97,6 @@ class ModelTrainer:
             )
 
         self.processor = AutoProcessor.from_pretrained(model_name)
-        if self.processor.tokenizer.pad_token is None:
-            self.processor.tokenizer.add_special_tokens(
-                {"pad_token": self.processor.tokenizer.eos_token}
-            )
 
         print(f"Loading model: {model_name}")
 
@@ -149,6 +145,12 @@ class ModelTrainer:
 
         if self.quantization is not None:
             self.model = prepare_model_for_kbit_training(self.model)
+
+        if self.processor.tokenizer.pad_token is None:
+            pad_value = self.processor.tokenizer.eos_token or "<pad>"
+            added = self.processor.tokenizer.add_special_tokens({"pad_token": pad_value})
+            if added > 0:
+                self.model.resize_token_embeddings(len(self.processor.tokenizer))
 
         # get_peft_model is called in train() once total_steps is known
 
