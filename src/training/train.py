@@ -207,6 +207,15 @@ class ModelTrainer:
                 return _orig_fwd(*args, **kwargs)
             _moonshine_base.forward = _fwd_no_input_ids
 
+            # Seq2SeqTrainer passes the full batch (including labels) to generate()
+            # during evaluation. Moonshine's generate() strictly validates kwargs and
+            # raises "not used by the model: labels". Strip it before forwarding.
+            _orig_generate = self.model.generate
+            def _generate_no_labels(*args, **kwargs):
+                kwargs.pop("labels", None)
+                return _orig_generate(*args, **kwargs)
+            self.model.generate = _generate_no_labels
+
         if self.model.config.model_type == "whisper":
             self.model.generation_config.language = "german"
             self.model.generation_config.task = "transcribe"
