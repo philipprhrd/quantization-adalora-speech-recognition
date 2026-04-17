@@ -109,7 +109,7 @@ class ModelTrainer:
             )
 
         model_kwargs = {
-            "dtype": torch.float16
+            "torch_dtype": torch.float16
             if torch.cuda.is_available()
             else torch.float32,
         }
@@ -237,7 +237,14 @@ class ModelTrainer:
         )
 
         print("Starting training...")
-        trainer.train(resume_from_checkpoint=True)
+        checkpoints = sorted(
+            Path(output_dir).glob("checkpoint-*"),
+            key=lambda p: int(p.name.split("-")[-1]),
+        )
+        resume = checkpoints[-1] if checkpoints else None
+        if resume:
+            print(f"Resuming from checkpoint: {resume}")
+        trainer.train(resume_from_checkpoint=resume)
 
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -252,9 +259,6 @@ class ModelTrainer:
         print(f"Saving model to {output_dir}")
         trainer.save_model(output_dir)
         self.processor.save_pretrained(output_dir)
-
-        
-        self.model.save_pretrained(output_dir)
 
         if self.quantization is None:
             merged_output_dir = output_path / "merged"
