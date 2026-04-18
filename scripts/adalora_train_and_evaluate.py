@@ -73,14 +73,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--eval-steps",
         type=int,
-        default=300,
-        help="Run evaluation every N steps (default: 300).",
+        default=1000,
+        help="Run evaluation every N steps (default: 1000).",
     )
     parser.add_argument(
         "--save-steps",
         type=int,
-        default=300,
-        help="Save checkpoint every N steps (default: 300).",
+        default=1000,
+        help="Save checkpoint every N steps (default: 1000).",
+    )
+    parser.add_argument(
+        "--eval-samples",
+        type=int,
+        default=None,
+        help="Limit eval to N random dev samples (default: use full dev set).",
+    )
+    parser.add_argument(
+        "--generation-max-length",
+        type=int,
+        default=225,
+        help="Max tokens to generate per sample during eval (default: 225).",
     )
     parser.add_argument(
         "--no-fp16",
@@ -156,6 +168,8 @@ def main() -> None:
         logging_steps=args.logging_steps,
         eval_steps=args.eval_steps,
         save_steps=args.save_steps,
+        eval_samples=args.eval_samples,
+        generation_max_length=args.generation_max_length,
     )
 
     if args.skip_eval:

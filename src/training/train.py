@@ -171,11 +171,17 @@ class ModelTrainer:
         fp16: bool = True,
         gradient_accumulation_steps: int = 2,
         logging_steps: int = 100,
-        eval_steps: int = 300,
-        save_steps: int = 300,
+        eval_steps: int = 1000,
+        save_steps: int = 1000,
+        eval_samples: int | None = None,
+        generation_max_length: int = 225,
     ) -> None:
         print(f"Loading data from {dataset_path}")
         dataset = load_from_disk(dataset_path)
+        eval_dataset = dataset["dev"]
+        if eval_samples is not None:
+            eval_dataset = eval_dataset.shuffle(seed=42).select(range(min(eval_samples, len(eval_dataset))))
+            print(f"Using {len(eval_dataset)} eval samples (shuffled, seed=42)")
 
         # Compute total training steps so AdaLoRA's rank scheduler has the
         # correct budget.  Must happen after dataset loading (size is unknown
@@ -263,6 +269,7 @@ class ModelTrainer:
             save_total_limit=3,
             logging_steps=logging_steps,
             predict_with_generate=True,
+            generation_max_length=generation_max_length,
             load_best_model_at_end=True,
             metric_for_best_model="wer",
             greater_is_better=False,
@@ -274,7 +281,7 @@ class ModelTrainer:
             model=self.model,
             args=training_args,
             train_dataset=dataset["train"],
-            eval_dataset=dataset["dev"],
+            eval_dataset=eval_dataset,
             data_collator=data_collator,
             tokenizer=self.processor.tokenizer,
             compute_metrics=compute_metrics,
