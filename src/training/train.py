@@ -173,7 +173,7 @@ class ModelTrainer:
         logging_steps: int = 100,
         eval_steps: int = 1000,
         save_steps: int = 1000,
-        eval_samples: int | None = None,
+        eval_samples: int | None = 500,
         generation_max_length: int = 225,
     ) -> None:
         print(f"Loading data from {dataset_path}")
@@ -275,6 +275,7 @@ class ModelTrainer:
             greater_is_better=False,
             remove_unused_columns=False,
             label_names=["labels"],
+            report_to="azure_ml",
         )
 
         trainer = Seq2SeqTrainer(
