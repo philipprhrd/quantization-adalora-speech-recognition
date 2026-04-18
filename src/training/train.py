@@ -180,7 +180,7 @@ class ModelTrainer:
         dataset = load_from_disk(dataset_path)
         eval_dataset = dataset["dev"]
         if eval_samples is not None:
-            eval_dataset = eval_dataset.shuffle(seed=42).select(range(min(eval_samples, len(eval_dataset))))
+            eval_dataset = eval_dataset.shuffle(seed=42, keep_in_memory=True).select(range(min(eval_samples, len(eval_dataset))))
             print(f"Using {len(eval_dataset)} eval samples (shuffled, seed=42)")
 
         # Compute total training steps so AdaLoRA's rank scheduler has the
