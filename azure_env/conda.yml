@@ -28,3 +28,6 @@ dependencies:
     - numpy
     - python-dotenv
     - evaluate
+
+    - mlflow
+    - azureml-flow
