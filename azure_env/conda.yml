@@ -30,4 +30,4 @@ dependencies:
     - evaluate
 
     - mlflow
-    - azureml-flow
+    - azureml-mlflow
