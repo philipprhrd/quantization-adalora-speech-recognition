@@ -31,3 +31,4 @@ dependencies:
 
     - mlflow
     - azureml-mlflow
+    - azureml-sdk
