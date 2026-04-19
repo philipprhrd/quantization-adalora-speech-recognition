@@ -209,6 +209,7 @@ class ModelTrainer:
         def _fwd_no_text_inputs(*args, **kwargs):
             kwargs.pop("input_ids", None)
             kwargs.pop("inputs_embeds", None)
+            kwargs.pop("num_items_in_batch", None)
             return _orig_fwd(*args, **kwargs)
         _audio_base.forward = _fwd_no_text_inputs
 
