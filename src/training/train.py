@@ -200,29 +200,25 @@ class ModelTrainer:
         lora_config = get_adalora_config(self.model_name, tinit, tfinal, total_steps)
         self.model = get_peft_model(self.model, lora_config)
 
-        # PeftModelForSeq2SeqLM always passes input_ids=None (text-model assumption)
-        # via **kwargs down to MoonshineDecoder, where it conflicts with the explicit
-        # input_ids=decoder_input_ids argument at modeling_moonshine.py:819.
-        if "moonshine" in self.model_name.lower():
-            _moonshine_base = self.model.base_model.model
-            _orig_fwd = _moonshine_base.forward
-            def _fwd_no_input_ids(*args, **kwargs):
-                # PEFT passes both as None (text-model assumption); neither is in
-                # Moonshine's named params so they leak via **kwargs to the decoder
-                # where they conflict with the decoder's own explicit params.
-                kwargs.pop("input_ids", None)
-                kwargs.pop("inputs_embeds", None)
-                return _orig_fwd(*args, **kwargs)
-            _moonshine_base.forward = _fwd_no_input_ids
+        # PeftModelForSeq2SeqLM is built for text encoders and always passes
+        # input_ids=None and inputs_embeds=None through **kwargs. Audio models
+        # (Whisper/Moonshine) don't have these as named params, so they leak
+        # down to the decoder which has them as explicit params → conflict.
+        _audio_base = self.model.base_model.model
+        _orig_fwd = _audio_base.forward
+        def _fwd_no_text_inputs(*args, **kwargs):
+            kwargs.pop("input_ids", None)
+            kwargs.pop("inputs_embeds", None)
+            return _orig_fwd(*args, **kwargs)
+        _audio_base.forward = _fwd_no_text_inputs
 
-            # Seq2SeqTrainer passes the full batch (including labels) to generate()
-            # during evaluation. Moonshine's generate() strictly validates kwargs and
-            # raises "not used by the model: labels". Strip it before forwarding.
-            _orig_generate = self.model.generate
-            def _generate_no_labels(*args, **kwargs):
-                kwargs.pop("labels", None)
-                return _orig_generate(*args, **kwargs)
-            self.model.generate = _generate_no_labels
+        # Seq2SeqTrainer passes the full batch (including labels) to generate()
+        # during eval. Strip labels before forwarding to avoid kwarg validation.
+        _orig_generate = self.model.generate
+        def _generate_no_labels(*args, **kwargs):
+            kwargs.pop("labels", None)
+            return _orig_generate(*args, **kwargs)
+        self.model.generate = _generate_no_labels
 
         if self.model.config.model_type == "whisper":
             self.model.generation_config.language = "german"
