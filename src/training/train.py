@@ -271,7 +271,6 @@ class ModelTrainer:
             greater_is_better=False,
             remove_unused_columns=False,
             label_names=["labels"],
-            report_to="azure_ml",
         )
 
         trainer = Seq2SeqTrainer(
