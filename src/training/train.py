@@ -160,6 +160,55 @@ class ModelTrainer:
 
         # get_peft_model is called in train() once total_steps is known
 
+    @staticmethod
+    def _extract_suffix_number(path: Path, prefix: str) -> int | None:
+        if not path.is_dir() or not path.name.startswith(prefix):
+            return None
+
+        suffix = path.name[len(prefix):]
+        if not suffix.isdigit():
+            return None
+
+        return int(suffix)
+
+    def _find_resume_checkpoint(self, output_dir: str) -> Path | None:
+        output_path = Path(output_dir)
+        retry_dirs = [
+            retry_dir
+            for retry_dir in output_path.iterdir()
+            if self._extract_suffix_number(retry_dir, "retry_") is not None
+        ] if output_path.exists() else []
+
+        if retry_dirs:
+            latest_retry_dir = max(
+                retry_dirs,
+                key=lambda path: self._extract_suffix_number(path, "retry_"),
+            )
+            checkpoints = [
+                checkpoint_dir
+                for checkpoint_dir in latest_retry_dir.glob("checkpoint-*")
+                if self._extract_suffix_number(checkpoint_dir, "checkpoint-") is not None
+            ]
+            if checkpoints:
+                return max(
+                    checkpoints,
+                    key=lambda path: self._extract_suffix_number(path, "checkpoint-"),
+                )
+            return None
+
+        checkpoints = [
+            checkpoint_dir
+            for checkpoint_dir in output_path.glob("checkpoint-*")
+            if self._extract_suffix_number(checkpoint_dir, "checkpoint-") is not None
+        ]
+        if checkpoints:
+            return max(
+                checkpoints,
+                key=lambda path: self._extract_suffix_number(path, "checkpoint-"),
+            )
+
+        return None
+
     def train(
         self,
         dataset_path: str,
@@ -285,13 +334,11 @@ class ModelTrainer:
         )
 
         print("Starting training...")
-        checkpoints = sorted(
-            Path(output_dir).glob("checkpoint-*"),
-            key=lambda p: int(p.name.split("-")[-1]),
-        )
-        resume = checkpoints[-1] if checkpoints else None
+        resume = self._find_resume_checkpoint(output_dir)
         if resume:
             print(f"Resuming from checkpoint: {resume}")
+        else:
+            print("No checkpoint found to resume from. Starting from scratch.")
         trainer.train(resume_from_checkpoint=resume)
 
         output_path = Path(output_dir)
