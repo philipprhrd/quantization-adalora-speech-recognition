@@ -13,8 +13,8 @@ every step independently.
 import shutil
 from pathlib import Path
 
+import onnx
 from onnxruntime.quantization import QuantType, quantize_dynamic
-from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
 from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
 from transformers import AutoProcessor
 
@@ -72,25 +72,28 @@ def quantize_int8(onnx_dir: str, output_dir: str) -> None:
 
 def quantize_int4(onnx_dir: str, output_dir: str) -> None:
     """
-    Apply weight-only INT4 quantization to every .onnx file in onnx_dir.
+    Apply NF4 weight quantization to every .onnx file in onnx_dir.
 
-    Uses MatMulNBitsQuantizer (bits=4) — standard ONNX INT4, no bitsandbytes
-    dependency, lower metadata overhead than NF4, better compression ratio.
-    Only MatMul weight tensors are quantized; activations stay in FP32.
+    Uses MatMulBnb4Quantizer with NF4 — the same 4-bit format as
+    bitsandbytes' bnb_4bit_quant_type="nf4".
+    Only MatMul weight tensors are quantized; everything else stays in FP32.
     """
+    from onnxruntime.quantization.matmul_bnb4_quantizer import MatMulBnb4Quantizer
+
     onnx_dir = Path(onnx_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     onnx_files = sorted(onnx_dir.glob("*.onnx"))
-    print(f"INT4 quantizing {len(onnx_files)} ONNX file(s) in {onnx_dir}")
+    print(f"INT4 (NF4) quantizing {len(onnx_files)} ONNX file(s) in {onnx_dir}")
 
     for f in onnx_files:
         out = output_dir / f.name
         print(f"  {f.name} ...")
-        quant = MatMulNBitsQuantizer(str(f), bits=4, block_size=32)
+        model = onnx.load(str(f))
+        quant = MatMulBnb4Quantizer(model, MatMulBnb4Quantizer.NF4, block_size=32)
         quant.process()
-        quant.model.save_model_to_file(str(out))
+        onnx.save(quant.model.model, str(out))
 
     # Copy tokenizer / config files unchanged
     for f in onnx_dir.iterdir():
