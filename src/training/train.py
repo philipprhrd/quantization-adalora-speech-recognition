@@ -174,6 +174,36 @@ class ModelTrainer:
     def _find_resume_checkpoint(self, output_dir: str) -> Path | None:
         output_path = Path(output_dir)
 
+        azureml_jobs_root = Path("/mnt/azureml/cr/j")
+        print(f"[resume-debug] Listing Azure ML jobs root: {azureml_jobs_root}")
+        if not azureml_jobs_root.exists():
+            print(f"[resume-debug] {azureml_jobs_root} does not exist")
+        else:
+            try:
+                siblings = sorted(azureml_jobs_root.iterdir())
+            except OSError as exc:
+                siblings = []
+                print(f"[resume-debug] cannot list {azureml_jobs_root}: {exc}")
+            if not siblings:
+                print(f"[resume-debug] {azureml_jobs_root} is empty")
+            for sibling in siblings:
+                marker = "/" if sibling.is_dir() else ""
+                print(f"[resume-debug]   {sibling.name}{marker}")
+                sibling_outputs = sibling / "exe" / "wd" / "outputs"
+                if sibling_outputs.exists():
+                    try:
+                        sub_entries = sorted(sibling_outputs.iterdir())
+                    except OSError as exc:
+                        sub_entries = []
+                        print(f"[resume-debug]     cannot list {sibling_outputs}: {exc}")
+                    if not sub_entries:
+                        print(f"[resume-debug]     exe/wd/outputs/ is empty")
+                    for sub in sub_entries:
+                        sub_marker = "/" if sub.is_dir() else ""
+                        print(f"[resume-debug]     exe/wd/outputs/{sub.name}{sub_marker}")
+                else:
+                    print(f"[resume-debug]     (no exe/wd/outputs)")
+
         print(f"[resume-debug] Scanning output_dir: {output_path.resolve()}")
         if not output_path.exists():
             print("[resume-debug] output_dir does not exist")
