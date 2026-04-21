@@ -1,26 +1,16 @@
 from peft import AdaLoraConfig, LoraConfig, TaskType
 
 
-def get_adalora_config(base_model: str, tinit: int, tfinal: int, total_step: int) -> LoraConfig:
+def _get_target_modules(base_model: str) -> list[str]:
     if "whisper" in base_model:
-        target_modules = [
-            "q_proj",  # Query projection
-            "k_proj",  # Key projection
-            "v_proj",  # Value projection
-            "out_proj",  # Output projection (Whisper nennt es out_proj)
-        ]
-    elif "moonshine" in base_model:
-        # Moonshine verwendet fuer die Attention-Ausgabe `o_proj` statt
-        # Whispers `out_proj`, daher braucht es eigene LoRA-Targets.
-        target_modules = [
-            "q_proj",  # Query projection
-            "k_proj",  # Key projection
-            "v_proj",  # Value projection
-            "o_proj",  # Output projection (Moonshine nennt es o_proj, nicht out_proj)
-            # fc1/fc2 (MLP-Layer) weglassen — Attention-Projektionen reichen für LoRA
-        ]
-    else:
-        raise ValueError(f"Unsupported base model for LoRA: {base_model}")
+        return ["q_proj", "k_proj", "v_proj", "out_proj"]
+    if "moonshine" in base_model:
+        return ["q_proj", "k_proj", "v_proj", "o_proj"]
+    raise ValueError(f"Unsupported base model for LoRA: {base_model}")
+
+
+def get_adalora_config(base_model: str, tinit: int, tfinal: int, total_step: int) -> LoraConfig:
+    target_modules = _get_target_modules(base_model)
 
     config = AdaLoraConfig(
         task_type=TaskType.SEQ_2_SEQ_LM,
@@ -38,3 +28,16 @@ def get_adalora_config(base_model: str, tinit: int, tfinal: int, total_step: int
     )
 
     return config
+
+
+def get_lora_config(base_model: str, r: int = 8) -> LoraConfig:
+    target_modules = _get_target_modules(base_model)
+
+    return LoraConfig(
+        task_type=TaskType.SEQ_2_SEQ_LM,
+        target_modules=target_modules,
+        r=r,
+        lora_alpha=16,
+        lora_dropout=0.05,
+        bias="none",
+    )

@@ -1,8 +1,6 @@
 import json
 import math
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Union
 import numpy as np
 from datasets import load_from_disk
 from jiwer import wer as compute_wer, cer as compute_cer
@@ -15,69 +13,12 @@ from transformers import (
     Seq2SeqTrainingArguments,
 )
 from src.training.lora_config import get_adalora_config
+from src.training.collator import (
+    DataCollatorMoonshineSeq2SeqWithPadding,
+    DataCollatorWhisperSeq2SeqWithPadding,
+)
+from src.training.trainer import MoonshineSeq2SeqTrainer
 import torch
-
-
-@dataclass
-class DataCollatorSpeechSeq2SeqWithPadding:
-    processor: AutoProcessor
-    decoder_start_token_id: int | None
-
-    def _resolve_input_name(
-        self, feature: Dict[str, Union[List[int], torch.Tensor]]
-    ) -> str:
-        model_input_names = getattr(
-            self.processor.feature_extractor, "model_input_names", []
-        )
-        if model_input_names and model_input_names[0] in feature:
-            return model_input_names[0]
-
-        # Moonshine trainiert auf rohen Audio-Werten (`input_values`), waehrend
-        # Whisper-Datensaetze oft bereits Log-Mel-Features (`input_features`) enthalten.
-        # Wir akzeptieren deshalb beide Formate und waehlen zur Laufzeit den passenden Key.
-        for input_name in ("input_features", "input_values"):
-            if input_name in feature:
-                return input_name
-
-        raise ValueError(
-            "Dataset sample is missing a supported audio input column. "
-            "Expected one of: input_features, input_values."
-        )
-
-    def __call__(
-        self, features: List[Dict[str, Union[List[int], torch.Tensor]]]
-    ) -> Dict[str, torch.Tensor]:
-        input_name = self._resolve_input_name(features[0])
-        input_features = [{input_name: feature[input_name]} for feature in features]
-
-        batch = self.processor.feature_extractor.pad(
-            input_features, return_tensors="pt", return_attention_mask=True
-        )
-        # Keep only the audio tensor and its mask — removes any extra keys
-        # (e.g. input_ids) that some feature extractors add and that would
-        # conflict with the decoder's input_ids parameter.
-        batch = {k: v for k, v in batch.items() if k in {input_name, "attention_mask"}}
-
-        # Pad labels with -100 (loss ignore index) directly — avoids needing
-        # a pad_token on the tokenizer, which Moonshine does not have by default.
-        label_tensors = [
-            torch.tensor(f["labels"], dtype=torch.long) for f in features
-        ]
-        labels = torch.nn.utils.rnn.pad_sequence(
-            label_tensors, batch_first=True, padding_value=-100
-        )
-
-        if (
-            self.decoder_start_token_id is not None
-            and labels.shape[1] > 0
-            and (labels[:, 0] == self.decoder_start_token_id).all().cpu().item()
-        ):
-            labels = labels[:, 1:]
-
-        batch["labels"] = labels
-
-        return batch
-
 
 class ModelTrainer:
     def __init__(
@@ -398,10 +339,19 @@ class ModelTrainer:
                 "cer": compute_cer(label_str, pred_str),
             }
 
-        data_collator = DataCollatorSpeechSeq2SeqWithPadding(
-            processor=self.processor,
-            decoder_start_token_id=self.model.config.decoder_start_token_id,
-        )
+        is_whisper = self.model.config.model_type == "whisper"
+
+        if is_whisper:
+            data_collator = DataCollatorWhisperSeq2SeqWithPadding(
+                processor=self.processor,
+                decoder_start_token_id=self.model.config.decoder_start_token_id,
+            )
+        else:
+            data_collator = DataCollatorMoonshineSeq2SeqWithPadding(
+                processor=self.processor,
+                decoder_start_token_id=self.model.config.decoder_start_token_id,
+                pad_token_id=self.processor.tokenizer.pad_token_id,
+            )
 
         training_args = Seq2SeqTrainingArguments(
             output_dir=output_dir,
@@ -427,7 +377,8 @@ class ModelTrainer:
             label_names=["labels"],
         )
 
-        trainer = Seq2SeqTrainer(
+        trainer_cls = Seq2SeqTrainer if is_whisper else MoonshineSeq2SeqTrainer
+        trainer = trainer_cls(
             model=self.model,
             args=training_args,
             train_dataset=train_dataset,
