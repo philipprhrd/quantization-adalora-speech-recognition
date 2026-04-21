@@ -25,3 +25,8 @@ dependencies = [
     "azure-identity",
     "onnx-ir>=0.2.0",
 ]
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.10.8",
+]

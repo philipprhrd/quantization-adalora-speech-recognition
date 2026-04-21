@@ -173,6 +173,27 @@ class ModelTrainer:
 
     def _find_resume_checkpoint(self, output_dir: str) -> Path | None:
         output_path = Path(output_dir)
+
+        print(f"[resume-debug] Scanning output_dir: {output_path.resolve()}")
+        if not output_path.exists():
+            print("[resume-debug] output_dir does not exist")
+        else:
+            entries = sorted(output_path.rglob("*"))
+            if not entries:
+                print("[resume-debug] output_dir is empty")
+            for entry in entries:
+                rel = entry.relative_to(output_path)
+                depth = len(rel.parts) - 1
+                indent = "  " * depth
+                if entry.is_dir():
+                    print(f"[resume-debug] {indent}{rel}/")
+                else:
+                    try:
+                        size = entry.stat().st_size
+                    except OSError:
+                        size = -1
+                    print(f"[resume-debug] {indent}{rel} ({size} bytes)")
+
         retry_dirs = [
             retry_dir
             for retry_dir in output_path.iterdir()
