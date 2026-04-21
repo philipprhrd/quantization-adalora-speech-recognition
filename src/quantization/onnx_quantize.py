@@ -44,7 +44,11 @@ def export_to_onnx(
 
     src = processor_path if processor_path is not None else model_path
     print(f"Loading processor from: {src}")
-    processor = AutoProcessor.from_pretrained(src, trust_remote_code=True)
+    try:
+        processor = AutoProcessor.from_pretrained(src)
+    except Exception as exc:
+        print(f"Standard processor load failed ({exc}); retrying with trust_remote_code=True")
+        processor = AutoProcessor.from_pretrained(src, trust_remote_code=True)
     processor.save_pretrained(output_dir)
 
     print(f"ONNX model saved to {output_dir}")
