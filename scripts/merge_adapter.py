@@ -55,6 +55,19 @@ def main() -> None:
         dtype=torch.float32,
     )
 
+    # Mirror the pad-token resize from train.py so the embedding shape matches
+    # the adapter checkpoint. Moonshine has no pad_token by default — the
+    # trainer adds one and calls resize_token_embeddings, growing vocab by 1.
+    adapter_processor = AutoProcessor.from_pretrained(args.adapter_path)
+    if adapter_processor.tokenizer.pad_token is not None:
+        adapter_vocab = len(adapter_processor.tokenizer)
+        if base.get_input_embeddings().weight.shape[0] != adapter_vocab:
+            print(
+                f"Resizing base embeddings {base.get_input_embeddings().weight.shape[0]}"
+                f" -> {adapter_vocab} to match adapter tokenizer"
+            )
+            base.resize_token_embeddings(adapter_vocab)
+
     print(f"Loading PEFT adapter from: {args.adapter_path}")
     model = PeftModel.from_pretrained(base, args.adapter_path)
 
@@ -64,8 +77,7 @@ def main() -> None:
     print(f"Saving merged model to: {args.output_dir}")
     merged.save_pretrained(args.output_dir)
 
-    processor = AutoProcessor.from_pretrained(args.adapter_path)
-    processor.save_pretrained(args.output_dir)
+    adapter_processor.save_pretrained(args.output_dir)
 
     print("Done.")
 
