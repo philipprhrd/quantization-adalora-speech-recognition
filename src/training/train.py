@@ -171,6 +171,32 @@ class ModelTrainer:
 
         return int(suffix)
 
+    def _resolve_explicit_checkpoint(self, resume_from: str) -> Path:
+        resume_path = Path(resume_from)
+        if not resume_path.exists():
+            raise FileNotFoundError(
+                f"resume_from path does not exist: {resume_path.resolve()}"
+            )
+
+        if self._extract_suffix_number(resume_path, "checkpoint-") is not None:
+            return resume_path
+
+        if resume_path.is_dir():
+            checkpoints = [
+                checkpoint_dir
+                for checkpoint_dir in resume_path.glob("checkpoint-*")
+                if self._extract_suffix_number(checkpoint_dir, "checkpoint-") is not None
+            ]
+            if checkpoints:
+                return max(
+                    checkpoints,
+                    key=lambda path: self._extract_suffix_number(path, "checkpoint-"),
+                )
+
+        raise FileNotFoundError(
+            f"No checkpoint-* directory found at or under {resume_path.resolve()}"
+        )
+
     def _find_resume_checkpoint(self, output_dir: str) -> Path | None:
         output_path = Path(output_dir)
 
@@ -275,6 +301,7 @@ class ModelTrainer:
         save_steps: int = 1000,
         eval_samples: int | None = 500,
         generation_max_length: int = 225,
+        resume_from: str | None = None,
     ) -> None:
         print(f"Loading data from {dataset_path}")
         dataset = load_from_disk(dataset_path)
@@ -390,11 +417,15 @@ class ModelTrainer:
         )
 
         print("Starting training...")
-        resume = self._find_resume_checkpoint(output_dir)
-        if resume:
-            print(f"Resuming from checkpoint: {resume}")
+        if resume_from is not None:
+            resume = self._resolve_explicit_checkpoint(resume_from)
+            print(f"Resuming from explicit checkpoint: {resume.resolve()}")
         else:
-            print("No checkpoint found to resume from. Starting from scratch.")
+            resume = self._find_resume_checkpoint(output_dir)
+            if resume:
+                print(f"Resuming from checkpoint: {resume}")
+            else:
+                print("No checkpoint found to resume from. Starting from scratch.")
         trainer.train(resume_from_checkpoint=resume)
 
         output_path = Path(output_dir)

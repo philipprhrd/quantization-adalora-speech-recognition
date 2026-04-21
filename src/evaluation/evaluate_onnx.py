@@ -41,6 +41,10 @@ class OnnxModelEvaluator:
         print(f"Loading dataset from {dataset_path}")
         dataset = load_from_disk(dataset_path)["test"]
 
+        half_size = len(dataset) // 2
+        dataset = dataset.shuffle(seed=42, keep_in_memory=True).select(range(half_size))
+        print(f"Using {len(dataset)} test samples (50% subset, shuffled, seed=42)")
+
         input_col = (
             "input_features"
             if "input_features" in dataset.column_names

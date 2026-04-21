@@ -99,6 +99,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable mixed-precision (fp16) training.",
     )
+    parser.add_argument(
+        "--resume-from",
+        default=None,
+        help=(
+            "Path to a checkpoint-* directory (or a folder containing checkpoint-* "
+            "subdirectories) to resume training from. Overrides auto-detection."
+        ),
+    )
 
     # --- Device / quantization (shared for training and evaluation) ---
     parser.add_argument(
@@ -170,6 +178,7 @@ def main() -> None:
         save_steps=args.save_steps,
         eval_samples=args.eval_samples,
         generation_max_length=args.generation_max_length,
+        resume_from=args.resume_from,
     )
 
     if args.skip_eval:
