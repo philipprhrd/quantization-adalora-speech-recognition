@@ -253,11 +253,16 @@ class ModelTrainer:
             eval_dataset = eval_dataset.shuffle(seed=42, keep_in_memory=True).select(range(min(eval_samples, len(eval_dataset))))
             print(f"Using {len(eval_dataset)} eval samples (shuffled, seed=42)")
 
+        train_dataset = dataset["train"]
+        half_size = len(train_dataset) // 2
+        train_dataset = train_dataset.shuffle(seed=42, keep_in_memory=True).select(range(half_size))
+        print(f"Using {len(train_dataset)} train samples (50% subset, shuffled, seed=42)")
+
         # Compute total training steps so AdaLoRA's rank scheduler has the
         # correct budget.  Must happen after dataset loading (size is unknown
         # until here) and before Trainer.train().
         steps_per_epoch = math.ceil(
-            len(dataset["train"]) / (batch_size * gradient_accumulation_steps)
+            len(train_dataset) / (batch_size * gradient_accumulation_steps)
         )
         total_steps = steps_per_epoch * num_epochs
         print(f"AdaLoRA total_step: {total_steps} ({steps_per_epoch} steps/epoch × {num_epochs} epochs)")
@@ -347,7 +352,7 @@ class ModelTrainer:
         trainer = Seq2SeqTrainer(
             model=self.model,
             args=training_args,
-            train_dataset=dataset["train"],
+            train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
             tokenizer=self.processor.tokenizer,
