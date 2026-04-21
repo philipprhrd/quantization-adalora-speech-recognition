@@ -57,6 +57,16 @@ def parse_args() -> argparse.Namespace:
         choices=["none", "int8", "int4"],
         help="Quantization to apply after ONNX export.",
     )
+    parser.add_argument(
+        "--processor-path",
+        default=None,
+        help=(
+            "Optional separate source for the processor/tokenizer. "
+            "Needed for Moonshine (custom TokenizersBackend gets lost on save_pretrained) — "
+            "pass the base HF name, e.g. 'usefulsensors/moonshine-tiny'. "
+            "Defaults to --model-path."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -69,7 +79,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     onnx_fp32_dir = output_dir / "onnx_fp32"
     print("\n=== Step 1: Export to ONNX ===")
-    export_to_onnx(args.model_path, str(onnx_fp32_dir))
+    export_to_onnx(args.model_path, str(onnx_fp32_dir), processor_path=args.processor_path)
 
     # ------------------------------------------------------------------
     # Step 2: Quantize

@@ -19,7 +19,9 @@ from optimum.onnxruntime import ORTModelForSpeechSeq2Seq
 from transformers import AutoProcessor
 
 
-def export_to_onnx(model_path: str, output_dir: str) -> None:
+def export_to_onnx(
+    model_path: str, output_dir: str, processor_path: str | None = None
+) -> None:
     """
     Export a HuggingFace speech model to ONNX.
 
@@ -28,12 +30,21 @@ def export_to_onnx(model_path: str, output_dir: str) -> None:
       decoder_model.onnx
       decoder_with_past_model.onnx
     plus the usual tokenizer / config files.
+
+    processor_path: optional separate source for the processor/tokenizer.
+        Needed for models with custom tokenizer backends (e.g. Moonshine's
+        TokenizersBackend), whose remote-code files are lost during
+        processor.save_pretrained(). Point this at the Hub base model name
+        (e.g. 'usefulsensors/moonshine-tiny') to load the processor fresh.
+        Defaults to model_path.
     """
     print(f"Exporting to ONNX: {model_path}")
     model = ORTModelForSpeechSeq2Seq.from_pretrained(model_path, export=True)
     model.save_pretrained(output_dir)
 
-    processor = AutoProcessor.from_pretrained(model_path)
+    src = processor_path if processor_path is not None else model_path
+    print(f"Loading processor from: {src}")
+    processor = AutoProcessor.from_pretrained(src, trust_remote_code=True)
     processor.save_pretrained(output_dir)
 
     print(f"ONNX model saved to {output_dir}")

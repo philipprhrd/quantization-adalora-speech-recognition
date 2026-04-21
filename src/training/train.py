@@ -6,7 +6,7 @@ from typing import Dict, List, Union
 import numpy as np
 from datasets import load_from_disk
 from jiwer import wer as compute_wer, cer as compute_cer
-from peft import get_peft_model, prepare_model_for_kbit_training
+from peft import PeftModel, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForSpeechSeq2Seq,
     AutoProcessor,
@@ -328,9 +328,30 @@ class ModelTrainer:
         tfinal = max(tinit + 1, int(0.60 * total_steps))
         print(f"AdaLoRA schedule: tinit={tinit}, tfinal={tfinal}, total_step={total_steps}")
 
-        print("Applying LoRA configuration")
-        lora_config = get_adalora_config(self.model_name, tinit, tfinal, total_steps)
-        self.model = get_peft_model(self.model, lora_config)
+        # Resolve resume checkpoint BEFORE applying PEFT. AdaLoRA prunes ranks
+        # per layer during training, so the saved adapter has heterogeneous
+        # lora_A/B/E shapes that a fresh get_peft_model(init_r=12) can't match.
+        # Loading via PeftModel.from_pretrained replays the saved rank_pattern
+        # and rebuilds matrices in the correct sizes.
+        if resume_from is not None:
+            resume = self._resolve_explicit_checkpoint(resume_from)
+            print(f"Resuming from explicit checkpoint: {resume.resolve()}")
+        else:
+            resume = self._find_resume_checkpoint(output_dir)
+            if resume:
+                print(f"Resuming from checkpoint: {resume}")
+            else:
+                print("No checkpoint found to resume from. Starting from scratch.")
+
+        if resume is not None:
+            print("Loading PEFT adapter from checkpoint (preserves AdaLoRA rank_pattern)")
+            self.model = PeftModel.from_pretrained(
+                self.model, str(resume), is_trainable=True
+            )
+        else:
+            print("Applying fresh LoRA configuration")
+            lora_config = get_adalora_config(self.model_name, tinit, tfinal, total_steps)
+            self.model = get_peft_model(self.model, lora_config)
 
         # PeftModelForSeq2SeqLM is built for text encoders and always passes
         # input_ids=None and inputs_embeds=None through **kwargs. Audio models
@@ -417,15 +438,6 @@ class ModelTrainer:
         )
 
         print("Starting training...")
-        if resume_from is not None:
-            resume = self._resolve_explicit_checkpoint(resume_from)
-            print(f"Resuming from explicit checkpoint: {resume.resolve()}")
-        else:
-            resume = self._find_resume_checkpoint(output_dir)
-            if resume:
-                print(f"Resuming from checkpoint: {resume}")
-            else:
-                print("No checkpoint found to resume from. Starting from scratch.")
         trainer.train(resume_from_checkpoint=resume)
 
         output_path = Path(output_dir)
