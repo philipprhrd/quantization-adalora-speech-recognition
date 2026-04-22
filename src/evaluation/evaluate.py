@@ -157,7 +157,9 @@ class ModelEvaluator:
 
             t0 = time.perf_counter()
             with torch.no_grad():
-                predicted_ids = self.model.generate(input_tensor)
+                # PeftModel.generate() erzwingt kwargs; Whisper erwartet
+                # input_features, Moonshine input_values.
+                predicted_ids = self.model.generate(**{input_col: input_tensor})
             # CUDA-Operationen sind asynchron — ohne synchronize() misst perf_counter()
             # nur den Kernel-Launch, nicht die echte Ausführungszeit auf der GPU.
             if self.model_device.type == "cuda":
