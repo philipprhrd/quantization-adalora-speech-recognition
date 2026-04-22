@@ -352,7 +352,11 @@ class ModelTrainer:
 
         def compute_metrics(pred):
             pred_ids = pred.predictions
-            label_ids = np.where(pred.label_ids != -100, pred.label_ids, pad_id)
+            label_ids = pred.label_ids
+            # Rust-Tokenizer casten nach uint32 — negative IDs (-100 padding,
+            # generate-Sentinels) werfen sonst OverflowError.
+            label_ids = np.where(label_ids == -100, pad_id, label_ids)
+            pred_ids = np.where(pred_ids < 0, pad_id, pred_ids)
             pred_str  = tokenizer.batch_decode(pred_ids,  skip_special_tokens=True)
             label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
             return {
