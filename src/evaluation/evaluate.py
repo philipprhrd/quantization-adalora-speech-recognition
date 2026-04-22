@@ -78,6 +78,16 @@ class ModelEvaluator:
         if is_lora:
             print(f"Loading base model: {base_model}")
             base = AutoModelForSpeechSeq2Seq.from_pretrained(base_model, **model_kwargs)
+            # Wenn der Adapter-Tokenizer durch das Training neue Special Tokens
+            # dazubekommen hat (Moonshine: BOS/EOS/PAD), muss die Embedding-Tabelle
+            # des Basismodells angepasst werden, sonst passt der Adapter nicht.
+            adapter_vocab = len(self.processor.tokenizer)
+            if base.get_input_embeddings().weight.shape[0] != adapter_vocab:
+                print(
+                    f"Resizing base embeddings {base.get_input_embeddings().weight.shape[0]}"
+                    f" -> {adapter_vocab} to match adapter tokenizer"
+                )
+                base.resize_token_embeddings(adapter_vocab)
             print(f"Loading LoRA adapter from: {model_path}")
             self.model = PeftModel.from_pretrained(base, model_path)
         else:
@@ -85,6 +95,26 @@ class ModelEvaluator:
             self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
                 base_model, **model_kwargs
             )
+
+        # Moonshine ships without BOS/EOS/PAD and without decoder_start_token_id.
+        # Required for generate() and to match how the model was trained.
+        if self.model.config.model_type == "moonshine":
+            added = self.processor.tokenizer.add_special_tokens({
+                "bos_token": "<s>",
+                "eos_token": "</s>",
+                "pad_token": "</s>",
+            })
+            if added > 0:
+                self.model.resize_token_embeddings(len(self.processor.tokenizer))
+            self.model.config.bos_token_id = self.processor.tokenizer.bos_token_id
+            self.model.config.eos_token_id = self.processor.tokenizer.eos_token_id
+            self.model.config.pad_token_id = self.processor.tokenizer.pad_token_id
+            self.model.config.decoder_start_token_id = self.processor.tokenizer.bos_token_id
+            if hasattr(self.model, "generation_config"):
+                self.model.generation_config.pad_token_id = self.model.config.pad_token_id
+                self.model.generation_config.bos_token_id = self.model.config.bos_token_id
+                self.model.generation_config.eos_token_id = self.model.config.eos_token_id
+                self.model.generation_config.decoder_start_token_id = self.model.config.decoder_start_token_id
 
         if device != "auto" and not uses_bnb_quantization:
             self.model.to(device)
@@ -134,6 +164,10 @@ class ModelEvaluator:
                 torch.cuda.synchronize()
             inference_time = time.perf_counter() - t0
 
+            # Rust-Tokenizer casten nach uint32 — negative IDs werfen OverflowError.
+            pad_id = self.processor.tokenizer.pad_token_id
+            if pad_id is not None:
+                predicted_ids = torch.where(predicted_ids < 0, pad_id, predicted_ids)
             pred_text = self.processor.tokenizer.batch_decode(
                 predicted_ids, skip_special_tokens=True
             )[0]
