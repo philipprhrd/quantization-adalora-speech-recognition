@@ -93,7 +93,22 @@ class ModelTrainer:
         if self.quantization is not None:
             self.model = prepare_model_for_kbit_training(self.model)
 
-        if self.processor.tokenizer.pad_token is None:
+        # Moonshine ships without BOS/EOS/PAD tokens and without decoder_start_token_id.
+        # Register the tokens on the tokenizer, resize the embedding table, and mirror
+        # the ids onto model.config so the collator and generate() can find them.
+        if self.model.config.model_type == "moonshine":
+            added = self.processor.tokenizer.add_special_tokens({
+                "bos_token": "<s>",
+                "eos_token": "</s>",
+                "pad_token": "</s>",
+            })
+            if added > 0:
+                self.model.resize_token_embeddings(len(self.processor.tokenizer))
+            self.model.config.bos_token_id = self.processor.tokenizer.bos_token_id
+            self.model.config.eos_token_id = self.processor.tokenizer.eos_token_id
+            self.model.config.pad_token_id = self.processor.tokenizer.pad_token_id
+            self.model.config.decoder_start_token_id = self.processor.tokenizer.bos_token_id
+        elif self.processor.tokenizer.pad_token is None:
             pad_value = self.processor.tokenizer.eos_token or "<pad>"
             added = self.processor.tokenizer.add_special_tokens({"pad_token": pad_value})
             if added > 0:
@@ -320,11 +335,17 @@ class ModelTrainer:
             self.model.generation_config.task = "transcribe"
         self.model.generation_config.forced_decoder_ids = None
 
-        # Moonshine has no pad_token_id by default — generate() requires it
-        if self.model.config.pad_token_id is None:
-            pad_id = self.processor.tokenizer.eos_token_id
-            self.model.config.pad_token_id = pad_id
-            self.model.generation_config.pad_token_id = pad_id
+        # Mirror the ids from model.config onto generation_config so generate()
+        # picks them up. Required for Moonshine (ids set in __init__) and harmless
+        # for Whisper.
+        if self.model.config.pad_token_id is not None:
+            self.model.generation_config.pad_token_id = self.model.config.pad_token_id
+        if self.model.config.bos_token_id is not None:
+            self.model.generation_config.bos_token_id = self.model.config.bos_token_id
+        if self.model.config.eos_token_id is not None:
+            self.model.generation_config.eos_token_id = self.model.config.eos_token_id
+        if self.model.config.decoder_start_token_id is not None:
+            self.model.generation_config.decoder_start_token_id = self.model.config.decoder_start_token_id
 
         tokenizer = self.processor.tokenizer
         pad_id = tokenizer.pad_token_id
