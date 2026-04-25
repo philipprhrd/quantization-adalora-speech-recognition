@@ -102,7 +102,7 @@ class ModelEvaluator:
             added = self.processor.tokenizer.add_special_tokens({
                 "bos_token": "<s>",
                 "eos_token": "</s>",
-                "pad_token": "</s>",
+                "pad_token": "<pad>",
             })
             if added > 0:
                 self.model.resize_token_embeddings(len(self.processor.tokenizer))

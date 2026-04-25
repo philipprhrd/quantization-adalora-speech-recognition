@@ -15,6 +15,7 @@ def get_adalora_config(base_model: str, tinit: int, tfinal: int, total_step: int
     config = AdaLoraConfig(
         task_type=TaskType.SEQ_2_SEQ_LM,
         target_modules=target_modules,
+        modules_to_save=["embed_tokens", "lm_head"],
         lora_alpha=16,
         lora_dropout=0.05,
         init_r=12,
@@ -36,6 +37,7 @@ def get_lora_config(base_model: str, r: int = 8) -> LoraConfig:
     return LoraConfig(
         task_type=TaskType.SEQ_2_SEQ_LM,
         target_modules=target_modules,
+        modules_to_save=["embed_tokens", "lm_head"],
         r=r,
         lora_alpha=16,
         lora_dropout=0.05,
